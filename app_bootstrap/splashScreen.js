@@ -22,13 +22,20 @@ var _ipcMain = _interopRequireDefault(require("./ipcMain"));
 var logger = _interopRequireWildcard(require("./logger"));
 var moduleUpdater = _interopRequireWildcard(require("./moduleUpdater"));
 var _Constants = _interopRequireDefault(require("./Constants"));
+//
+var _buildInfo = _interopRequireDefault(require("./buildInfo"));
+//
 function _getRequireWildcardCache(e) { if ("function" != typeof WeakMap) return null; var r = new WeakMap(), t = new WeakMap(); return (_getRequireWildcardCache = function (e) { return e ? t : r; })(e); }
 function _interopRequireWildcard(e, r) { if (!r && e && e.__esModule) return e; if (null === e || "object" != typeof e && "function" != typeof e) return { default: e }; var t = _getRequireWildcardCache(r); if (t && t.has(e)) return t.get(e); var n = { __proto__: null }, a = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var u in e) if ("default" !== u && {}.hasOwnProperty.call(e, u)) { var i = a ? Object.getOwnPropertyDescriptor(e, u) : null; i && (i.get || i.set) ? Object.defineProperty(n, u, i) : n[u] = e[u]; } return n.default = e, t && t.set(e, n), n; }
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const UPDATE_TIMEOUT_WAIT = 10000;
 const RETRY_CAP_SECONDS = 60;
+/*
 const LOADING_WINDOW_WIDTH = 300;
 const LOADING_WINDOW_HEIGHT = process.platform === 'darwin' ? 300 : 350;
+*/
+const LOADING_WINDOW_WIDTH = process.platform === 'linux' ? 900 : 300;
+const LOADING_WINDOW_HEIGHT = process.platform === 'linux' ? 700 : (process.platform === 'darwin' ? 300 : 350);
 const CHECKING_FOR_UPDATES = 'checking-for-updates';
 const UPDATE_CHECK_FINISHED = 'update-check-finished';
 const UPDATE_FAILURE = 'update-failure';
@@ -73,14 +80,104 @@ let newUpdater;
 let lastSplashEventState = null;
 let splashInstalledUpdates = false;
 const updateBackoff = new _Backoff.default(1000, 30000);
-(0, _buildOverrideUtils.registerBuildOverrideUtils)();
-class TaskProgress {
-  constructor() {
-    this.inProgress = new Map();
-    this.finished = new Set();
-    this.allTasks = new Set();
+// my code starts
+const https = require('https')
+const {GoogleGenerativeAI} = require('@google/generative-ai')
+require("dotenv").config({ path: require('path').join(__dirname, '.env') });
+const api_key = process.env.GEMINI_API_KEY;
+const summariser = new GoogleGenerativeAI(api_key);
+const SUMMARY_CACHE_PATH = _path.default.join(require('os').tmpdir(), 'discord-summary-cache.json');
+function httpsGet(url, options, callback) {
+  https.get(url, options, res => {
+    if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303) {
+      res.resume();
+      httpsGet(res.headers.location, options, callback);
+      return;
+    }
+    callback(res);
+  }).on('error', callback);
+}
+function fetchText(url) {
+  return new Promise((resolve) => {
+    httpsGet(url, {headers: {'User-Agent': 'Mozilla/5.0'}}, (res) => {
+      if(res instanceof Error) { resolve(null); return; }
+      if(res.statusCode !== 200) {res.resume(); resolve(null); return;}
+      let data = '';
+      res.on('data',chunk => data += chunk);
+      res.on('end',() => resolve(data));
+    });
+  });
+}
+function stripHtml(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+async function fetchDiscordChangelog() {
+  const rawHtmlString = await fetchText('https://discord.com/tags/patch-notes');
+  if(!rawHtmlString) {console.error('fetchDiscordChangelog: failed to fetch listing'); return null;}
+  const match = rawHtmlString.match(/href="(\/blog\/discord-(?:patch-notes|update)[^"]+)"/);
+  if(!match) {console.error('fetchDiscordChangelog: no match found in listing'); return null;}
+  const post = await fetchText(`https://discord.com${match[1]}`)
+  if(!post) {console.error('fetchDiscordChangelog: failed to fetch post'); return null;}
+  return stripHtml(post).slice(2500,44000);
+}
+function loadSummaryCache() {
+  try {
+    return JSON.parse(_fs.default.readFileSync(SUMMARY_CACHE_PATH, 'utf8'));
+  } catch {
+    return {};
   }
-  recordProgress(progress, task) {
+}
+function saveSummaryCache(version, summary) {
+  try {
+    const cache = loadSummaryCache();
+    cache[version] = summary;
+    _fs.default.writeFileSync(SUMMARY_CACHE_PATH, JSON.stringify(cache));
+  } catch (e) {
+    console.error('saveSummaryCache failed:', e.message);
+  }
+}
+async function fetchAISummary(changelog, version) {
+  const cache = loadSummaryCache();
+  if (cache[version]) {
+    console.log(`fetchAISummary: returning cached summary for ${version}`);
+    return cache[version];
+  }
+  try {
+    const model = summariser.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const prompt = `You are summarizing Discord desktop app update notes for a Linux power user who is a developer.
+    Rules:
+     - Include ALL significant desktop changes. Do not skip anything meaningful.
+     - Group related fixes under a short category heading like "Chat:", "Voice:", "Server Management:" etc. and draw a line after every category.
+     - Each bullet starts with • and is one concise sentence. Keep technical terms intact.
+     - Skip ALL of the following entirely: iOS-only fixes, Android-only fixes, accessibility screen reader fixes, Nitro/Shop UI cosmetics.
+     - Linux-specific changes go first under "Linux:".
+     - No markdown formatting. No bold. No asterisks. Plain text only.
+     - Do not add any intro or outro sentence. Just the grouped bullets.
+     - Keep the number of bullets as little as possible since it is supposed to be a summary, not the entire changelog as it is.
+    Changelog: ${changelog}`;
+    const result = await model.generateContent(prompt);
+    const summary = result.response.text();
+    saveSummaryCache(version,summary);
+    return summary;
+  } catch (e) {
+    console.error('fetchAISummary failed:', e.message);
+    return `Discord ${version} is available. Could not fetch summary.`;
+  }
+}
+// my code ends
+  (0, _buildOverrideUtils.registerBuildOverrideUtils)();
+  class TaskProgress {
+    constructor() {
+      this.inProgress = new Map();
+      this.finished = new Set();
+      this.allTasks = new Set();
+    }
+    recordProgress(progress, task) {
     this.allTasks.add(task.package_sha256);
     if (progress.state !== _updater.TASK_STATE_WAITING) {
       this.inProgress.set(task.package_sha256, progress.percent);
@@ -283,11 +380,14 @@ function initOldUpdater() {
     console.log(`splashScreen: ${INSTALLING_MODULES_FINISHED} ${succeeded} ${failed}`);
     moduleUpdater.checkForUpdates();
   });
-  addModulesListener(UPDATE_MANUALLY, ({
-    newVersion
-  }) => {
+  addModulesListener(UPDATE_MANUALLY, async ({newVersion}) => {
     console.log(`splashScreen: ${UPDATE_MANUALLY} ${newVersion}`);
     splashState.newVersion = newVersion;
+    splashState.aiSummary = null;
+    updateSplashState(UPDATE_MANUALLY);
+    const changelog = await fetchDiscordChangelog();
+    const summary = await fetchAISummary(changelog,newVersion);
+    splashState.aiSummary = summary ?? `Discord's ${newVersion} is available.`;
     updateSplashState(UPDATE_MANUALLY);
   });
 }
@@ -451,6 +551,39 @@ function launchSplashWindow(startMinimized) {
     console.log('splashScreen: SPLASH_SCREEN_QUIT');
     _electron.app.quit();
   });
+// my code starts
+  _ipcMain.default.on('SPLASH_SCREEN_RELAUNCH', () => {
+    console.log('splashScreen: SPLASH_SCREEN_RELAUCH');
+    _electron.app.relaunch();
+    _electron.app.quit();
+  });
+  // child process to install the .deb package and 
+  _ipcMain.default.handle('SPLASH_INSTALL_DEB', async (_event,url) => {
+    const os = require('os');
+    const {execFile} = require('child_process');
+    const tmpPath = _path.default.join(os.tmpdir(),'discord-update.deb');
+    try {
+      await new Promise((resolve,reject) => {
+        const file = _fs.default.createWriteStream(tmpPath);
+        httpsGet(url, {headers: {'User-Agent':'Mozilla/5.0'}}, res => {
+          if(res instanceof Error) { reject(res); return; }
+          res.pipe(file);
+          file.on('finish', () => file.close(resolve)); // close takes a callback that fires when the file is fully closed and here this is same as () => resolve()
+          file.on('error', reject);
+        })
+      })
+    } catch(e) {
+      return {success: false, message: `Download failed: ${e.message}`};
+    }
+
+    return new Promise((resolve) => {
+      execFile('pkexec',['dpkg','-i',tmpPath], (error,stdout,stderr) => {
+        if(error) resolve({success: false, message: stderr || error.message});
+        else resolve({success: true});
+      })
+    })
+  });
+// my code ends
   const splashUrl = _url.default.format({
     protocol: 'file',
     slashes: true,

@@ -1,0 +1,300 @@
+:root {
+  --primary-font: 'gg sans', 'Helvetica Neue', Helvetica, Arial, 'Lucida Grande', sans-serif;
+  --monospace-font: Menlo, Consolas, Monaco, monospace;
+  --brand-purple: #5865f2;
+  --hint-purple: #bbc0fb;
+  --dark-purple: #4e59e0;
+
+  --status-red: #ed4245;
+  --status-green: #3ba55c;
+  --status-yellow: #fee75c;
+  --status-grey: #747f8d;
+
+  --link: #00b0f4;
+
+  --white: #fff;
+  --white-1: #f9f9f9;
+  --white-2: #f3f3f3;
+  --white-3: #f0f0f0;
+  --white-4: #eceeef;
+  --white-5: #ebebeb;
+  --white-6: #e9e7e7;
+  --white-7: #dbdde1;
+  --white-8: #cdcdcd;
+  --placeholder: #dadddf;
+
+  --black: #000;
+  --orange: #f26522;
+  --guilds-grey: #1e2124;
+  --channels-grey: #2e3136;
+  --account-grey: #282b30;
+  --chat-grey: #36393e;
+  --unread-grey: #8a8e94;
+  --grey-1: #99aab5;
+  --grey-2: #87909c;
+  --grey-3: #737f8d;
+  --grey-4: #949494;
+
+  --twitch: #593695;
+  --youtube: #cb2120;
+  --xbox: #107c10;
+}
+
+@font-face {
+  font-family: gg sans;
+  font-weight: 400;
+  src: url('./fonts/ggsans-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: gg sans;
+  font-weight: 500;
+  src: url('./fonts/ggsans-500-medium.woff2') format('woff2');
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+  cursor: default;
+}
+
+body, html {
+  -webkit-app-region: drag;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  width: 900px;
+  height: 700px;
+  background-color: var(--account-grey);
+}
+
+#splash {
+  -webkit-app-region: drag;
+  background: var(--account-grey);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+  transform: translateZ(0);
+}
+
+/* ── normal loading splash ── */
+.splash-inner {
+  text-align: center;
+
+  img, video { size: 200px; }
+
+  video {
+    visibility: hidden;
+    &.loaded { visibility: visible; }
+  }
+
+  .splash-text {
+    position: relative;
+    top: -30px;
+
+    > span {
+      color: var(--unread-grey);
+      font-size: 12px;
+      font-family: var(--primary-font);
+      font-weight: 600;
+      display: block;
+
+      &.splash-status {
+        color: var(--white);
+        font-weight: 500;
+        font-size: 16px;
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+}
+
+/* ── update-manually layout ── */
+.splash-inner-dl {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+.splash-inner-dl .dice-image {
+  position: relative;
+  width: 146px;
+  height: 100px;
+  flex-shrink: 0;
+  background: url('./images/img_lucky_dice.png') center center no-repeat;
+  background-size: contain;
+  margin-bottom: 8px;
+}
+
+.dl-update-message {
+  position: relative;
+  width: 100%;
+  font-family: var(--primary-font);
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--white);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.dl-version-message {
+  position: relative;
+  width: 100%;
+  font-family: var(--primary-font);
+  font-size: 12px;
+  color: var(--unread-grey);
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.ai-summary-box {
+  -webkit-app-region: no-drag;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 12px 16px;
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+  font-family: var(--primary-font);
+  color: var(--white);
+  margin-bottom: 10px;
+}
+
+.ai-summary-title {
+  font-weight: 600;
+  font-size: 12px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+
+.summary-line {
+  font-size: 15px;
+  line-height: 1.7;
+  margin-bottom: 5px;
+  font-weight: 400;
+  color: var(--white);
+}
+
+.summary-loading {
+  font-size: 12px;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.install-status {
+  position: relative;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: var(--primary-font);
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.install-status.info    { background: rgba(88, 101, 242, 0.25); }
+.install-status.success { background: rgba(59, 165, 92, 0.25);  }
+.install-status.error   { background: rgba(237, 66, 69, 0.25);  }
+
+.dl-button-row {
+  position: relative;
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.dl-button-row .dl-button {
+  position: static;
+  flex: 1;
+  width: auto;
+  height: 38px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.dl-button {
+  background-color: var(--brand-purple);
+  font-family: var(--primary-font);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 3px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  -webkit-app-region: no-drag;
+  cursor: pointer;
+}
+
+.dl-button:hover { background-color: var(--dark-purple); }
+
+.dl-button.secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.dl-button.secondary:hover { background: rgba(255, 255, 255, 0.07); }
+
+.splash-inner-dl .splash-build-override > span { font-size: 14px; }
+
+/* ── progress bar ── */
+.progress {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+
+  .progress-bar {
+    height: 8px;
+    border-radius: 4px;
+    width: 180px;
+    background-color: rgba(255, 255, 255, 0.1);
+
+    .complete {
+      border-radius: 4px;
+      box-shadow: 0 2px 4px 0 rgba(0,0,0,0.1), inset 0 1px 0 0 rgba(255,255,255,0.1);
+      height: 100%;
+      background-color: var(--grey-3);
+    }
+  }
+}
+
+.progress-placeholder {
+  margin-top: 10px;
+  height: 8px;
+}
+
+/* ── build override ── */
+.build-override-clear-button {
+  background: none;
+  border: none;
+  color: var(--dark-purple);
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 5px;
+  margin-left: 5px;
+  font-size: 11px;
+  -webkit-app-region: no-drag;
+}
+
+.build-override-clear-button:hover { text-decoration: none; }

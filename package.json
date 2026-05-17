@@ -1,0 +1,27 @@
+{
+    "name": "discord",
+    "license": "UNLICENSED",
+    "description": "Discord Client for Desktop - Bootstrapper",
+    "main": "app_bootstrap/index.js",
+    "private": true,
+    "scripts": {
+        "eslint": "eslint . --ext .ts,.tsx --color --quiet",
+        "prettier": "prettier --write .",
+        "tsc": "tsc --pretty"
+    },
+    "dependencies": {
+        "@google/generative-ai": "^0.24.1",
+        "@sentry/browser": "7.112.0",
+        "@sentry/electron": "4.24.0",
+        "arch": "2.2.0",
+        "dotenv": "^17.4.2",
+        "electron-log": "5.2.0",
+        "request": "2.88.0",
+        "yauzl": "^2.10.0"
+    },
+    "devDependencies": {
+        "@types/node": "*",
+        "@types/request": "^2.48.5",
+        "electron": "37.6.1"
+    }
+}

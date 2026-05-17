@@ -59,6 +59,7 @@ function renderBuildOverride(override) {
     <button class="build-override-clear-button" id="build-override-clear">clear?</button>
   </div>`;
 }
+/*
 function renderUpdateManually(state, override) {
   const options = DOWNLOAD_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
   return `<div id="splash">
@@ -74,6 +75,26 @@ function renderUpdateManually(state, override) {
       <div class="dl-version-message">Version ${escapeHtml(state.newVersion ?? '')} available</div>
     </div>
     ${override != null ? renderBuildOverride(override) : ''}
+  </div>`;
+}
+*/
+function renderUpdateManually(state,override) {
+  const summaryContent = state.aiSummary ? state.aiSummary.split('\n').filter(bullet => bullet.trim()).map(bullet => `<div class="summary-line">${escapeHtml(bullet)}</div>`).join('') : '<div class="summary-loading">Loading summary\u2026</div>';
+  return `<div id="splash">
+    <div class="splash-inner-dl">
+      <div class="dice-image"></div>
+      <div class="dl-update-message">Update Available</div>
+      <div class="dl-version-message">Discord ${escapeHtml(state.newVersion ?? '')}</div>
+      <div class="ai-summary-box">
+        <div class="ai-summary-title">What\u2019s new</div>
+        <div id="ai-summary-content">${summaryContent}</div>
+      </div>
+      <div id="install-status" class="install-status" style="display:none"></div>
+      <div class="dl-button-row">
+        <div class="dl-button" id="dl-button">Download &amp; Install</div>
+      </div>
+      ${override !=null ? renderBuildOverride(override) : ''}
+    </div>
   </div>`;
 }
 function renderSplashHtml(state) {
@@ -137,6 +158,17 @@ function renderSplash(state) {
   const mount = document.getElementById('splash-mount');
   if (mount == null) return;
   if (state.status === 'update-manually') {
+    if (currentLayout === 'update-manually' && state.aiSummary) {
+      const el = document.getElementById('ai-summary-content');
+      if (el) {
+        el.innerHTML = state.aiSummary
+          .split('\n')
+          .filter(l => l.trim())
+          .map(l => `<div class="summary-line">${escapeHtml(l)}</div>`)
+          .join('');
+      }
+      return;
+    }
     currentLayout = 'update-manually';
     mount.innerHTML = renderUpdateManually(state, buildOverride);
     bindManualUpdateEvents();
@@ -156,6 +188,7 @@ function bindVideoEvents() {
     });
   }
 }
+/*
 function bindManualUpdateEvents() {
   const select = document.getElementById('dl-select-input');
   if (select != null) {
@@ -175,6 +208,42 @@ function bindManualUpdateEvents() {
       (0, _securityUtils.saferShellOpenExternal)(LINUX_DOWNLOAD_URL_BASE + selectedDownload).then(quit, quit);
     } else {
       quit();
+    }
+  });
+  bindBuildOverrideEvents();
+}
+*/
+function bindManualUpdateEvents() {
+  const installBtn = document.getElementById(`dl-button`)
+  const statusEl = document.getElementById('install-status');
+  const DEB_URL = `https://discord.com/api/download/${_buildInfo.default.releaseChannel}?platform=linux&format=deb`;
+  
+  installBtn?.addEventListener('click', async () => {
+    installBtn.textContent = 'Downloading...'
+    installBtn.style.pointerEvents = 'none';
+    statusEl.style.display = 'block';
+    statusEl.className = 'install-status info';
+    statusEl.textContent = 'Downloading update...';
+    let result;
+    try {
+      result = await _electron.ipcRenderer.invoke('DISCORD_SPLASH_INSTALL_DEB',DEB_URL)
+    } catch(e) {
+      statusEl.className = 'install-status error';
+      statusEl.textContent = `Error: ${e.message}`;
+      installBtn.textContent = 'Retry';
+      installBtn.style.pointerEvents = 'auto';
+      return;
+    }
+    if(result.success) {
+      statusEl.className = 'install-status success';
+      statusEl.textContent = 'Installed! Relaunching...';
+      installBtn.style.display = 'none';
+      setTimeout(() => _electron.ipcRenderer.send('DISCORD_SPLASH_SCREEN_RELAUNCH'), 2000);
+    } else {
+      statusEl.className = 'install-status error';
+      statusEl.textContent = `Failed: ${result.message}`;
+      installBtn.textContent = 'Retry';
+      installBtn.style.pointerEvents = 'auto';
     }
   });
   bindBuildOverrideEvents();
